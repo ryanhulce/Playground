@@ -249,3 +249,8 @@ button.more { margin: 2px 0 10px; font-size: 12px; padding: 4px 10px; }
 .card-sub .health-link { color: #79c0ff; text-decoration: none; }
 .card-sub .health-link:hover { text-decoration: underline; }
 .vb.upd { background: var(--outage); color: #1a1205; margin-left: 4px; font-size: 10px; vertical-align: 1px; }
+.card-sub .crit-link { color: #ff9bb0; text-decoration: none; }
+.card-sub .crit-link:hover { text-decoration: underline; }
+/* Vulnerabilities toolbar: summary counts on the first row, all filters on the second. */
+#view-vulns .svc-toolbar #vuln-summary { flex-basis: 100%; margin-right: 0; }
+#view-vulns .svc-toolbar { row-gap: 8px; }

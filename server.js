@@ -2,6 +2,7 @@
 // Periodically scours news feeds and status pages, then serves the results
 // as JSON plus a static map UI.
 const http = require('http');
+const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 const { NEWS_FEEDS, STATUS_PAGES, fetchNews, fetchStatus } = require('./lib/sources');
@@ -44,7 +45,7 @@ async function refreshVulns() {
   vulns.refreshing = true;
   try {
     vulns = { ...(await collectVulns()), updatedAt: new Date().toISOString(), refreshing: false };
-    console.log(`[${vulns.updatedAt}] vulnerabilities: ${vulns.exploited.length} exploited, ${vulns.newCritical.length} new critical`);
+    console.log(`[${vulns.updatedAt}] vulnerabilities: ${vulns.exploited.length} exploited, ${vulns.newCritical.length} new high/critical`);
   } catch (err) {
     vulns.refreshing = false;
     vulns.error = String(err.message || err);
@@ -98,6 +99,14 @@ function vulnCountsByService(days = 30) {
       if (v.ransomware) counts[id].ransomware++;
     }
   }
+  const critCutoff = new Date(Date.now() - 14 * 864e5).toISOString();
+  for (const v of vulns.newCritical || []) {
+    if (!v.vendorKey || (v.cvss?.score || 0) < 9 || v.published < critCutoff) continue;
+    for (const id of servicesFor[v.vendorKey] || []) {
+      counts[id] ||= { count: 0, ransomware: 0, vendorKey: v.vendorKey };
+      counts[id].critical = (counts[id].critical || 0) + 1;
+    }
+  }
   return counts;
 }
 
@@ -148,17 +157,27 @@ async function refreshIncidents() {
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
 const PUBLIC = path.join(__dirname, 'public');
 
+// JSON responses, gzip-compressed when the browser accepts it (vulnerability data is ~2 MB raw).
+function sendJson(req, res, obj, pretty = false) {
+  const body = JSON.stringify(obj, null, pretty ? 2 : 0);
+  const headers = { 'content-type': 'application/json', 'cache-control': 'no-store', vary: 'accept-encoding' };
+  if (/\bgzip\b/.test(req.headers['accept-encoding'] || '') && body.length > 1024) {
+    res.writeHead(200, { ...headers, 'content-encoding': 'gzip' });
+    return res.end(zlib.gzipSync(body));
+  }
+  res.writeHead(200, headers);
+  return res.end(body);
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   if (url.pathname === '/api/incidents') {
     if (!state.updatedAt) await refreshIncidents();
-    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    return res.end(JSON.stringify(state));
+    return sendJson(req, res, state);
   }
   if (url.pathname === '/api/diagnostics') {
     // Configuration check. Shows whether settings are visible to the app, never their values.
-    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    return res.end(JSON.stringify({
+    return sendJson(req, res, {
       version: pkg.version,
       startedAt: STARTED_AT,
       azureSiteName: process.env.WEBSITE_SITE_NAME || null,
@@ -167,28 +186,24 @@ const server = http.createServer(async (req, res) => {
       sources: state.sources.filter((s) => s.kind === 'measured'),
       vulnerabilitySources: vulns.sources,
       healthcareSources: health.sources,
-    }, null, 2));
+    }, true);
   }
   if (url.pathname === '/api/version') {
-    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    return res.end(JSON.stringify({ version: pkg.version, releaseDate: pkg.releaseDate, startedAt: STARTED_AT, node: process.version, refreshMinutes: REFRESH_MIN, changelog }));
+    return sendJson(req, res, { version: pkg.version, releaseDate: pkg.releaseDate, startedAt: STARTED_AT, node: process.version, refreshMinutes: REFRESH_MIN, changelog });
   }
   if (url.pathname === '/api/services') {
     if (!services.updatedAt) await refreshServices();
-    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     const vc = vulnCountsByService(30);
     const hc = healthAlertsByService();
-    return res.end(JSON.stringify({ ...services, services: services.services.map((s) => ({ ...s, ...(vc[s.id] ? { vulns: vc[s.id] } : {}), ...(hc[s.id] ? { health: hc[s.id] } : {}) })) }));
+    return sendJson(req, res, { ...services, services: services.services.map((s) => ({ ...s, ...(vc[s.id] ? { vulns: vc[s.id] } : {}), ...(hc[s.id] ? { health: hc[s.id] } : {}) })) });
   }
   if (url.pathname === '/api/healthcare') {
     if (!health.updatedAt && !health.refreshing) refreshHealthcare();
-    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    return res.end(JSON.stringify(health));
+    return sendJson(req, res, health);
   }
   if (url.pathname === '/api/vulns') {
     if (!vulns.updatedAt && !vulns.refreshing) refreshVulns(); // first load: answer at once, page polls
-    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    return res.end(JSON.stringify(vulns));
+    return sendJson(req, res, vulns);
   }
   if (url.pathname === '/api/refresh' && req.method === 'POST') {
     await refresh();

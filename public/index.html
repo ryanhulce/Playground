@@ -99,12 +99,21 @@
         <button data-scope="all">All vendors</button>
       </div>
       <select id="vuln-range" title="Added to CISA's list within">
-        <option value="7">Last 7 days</option>
-        <option value="30" selected>Last 30 days</option>
-        <option value="90">Last 90 days</option>
+        <option value="7">7 days</option>
+        <option value="30" selected>30 days</option>
+        <option value="90">90 days</option>
+      </select>
+      <div class="seg" id="vuln-show" title="Which vulnerabilities to show">
+        <button data-show="both" class="on">All</button>
+        <button data-show="exploited" title="Confirmed exploited (CISA KEV)">Exploited</button>
+        <button data-show="new" title="New high/critical vulnerabilities not yet known to be exploited">Not yet</button>
+      </div>
+      <select id="vuln-sev" title="Minimum severity for not-yet-exploited vulnerabilities">
+        <option value="9">Critical 9+</option>
+        <option value="7">High 7+</option>
       </select>
       <label class="check" title="Only vulnerabilities known to be used in ransomware attacks"><input type="checkbox" id="vuln-ransom" /> Ransomware</label>
-      <input id="vuln-search" type="search" placeholder="Search CVE, product…" style="width:160px" />
+      <input id="vuln-search" type="search" placeholder="Search CVE, product…" style="width:190px" />
       <button id="vuln-edit" title="Choose which vendors count as yours">⚙ Edit list</button>
     </div>
     <div class="svc-body">
@@ -116,7 +125,8 @@
         <h2>How to read this</h2>
         <ul class="legend-list small">
           <li><b>Exploited</b>: on CISA's Known Exploited Vulnerabilities list, so attackers are using it. Patch these first.</li>
-          <li><b>CVSS</b>: how severe it is, 0–10 (9+ critical, 7+ high).</li>
+          <li><b>CVSS</b>: how severe it is, 0–10 (9+ critical, 7+ high). "vendor score" means NVD hasn't analysed it yet, so the score is the vendor's own.</li>
+          <li><b>CISA: PoC / Exploited / None</b>: CISA's early assessment of a new CVE. "PoC" means public exploit code exists.</li>
           <li><b>EPSS</b>: estimated chance it will be exploited in the next 30 days.</li>
           <li><b>CISA deadline</b>: the patch deadline for U.S. federal agencies, a useful benchmark.</li>
           <li><b>Ransomware</b>: known to be used in ransomware attacks.</li>

@@ -78,12 +78,12 @@ Open **🏥 Healthcare**, or go to `/#health`. It refreshes hourly:
 Open **🛡 Vulnerabilities**, or go to `/#vulns`. It shows:
 
 - **Confirmed exploited:** vulnerabilities on CISA's Known Exploited Vulnerabilities (KEV) list, added in the last 7, 30 or 90 days. Each shows its **CVSS** severity score and **EPSS** score (the estimated chance it will be exploited in the next 30 days), both from NVD and FIRST.org. It also shows whether the vulnerability is linked to ransomware, CISA's patch deadline for U.S. federal agencies, and links to the vendor advisories.
-- **New critical, not yet known to be exploited:** CVSS 9.0+ vulnerabilities published in the last 14 days (NVD), as an early warning. A high EPSS score means exploitation is likely soon.
+- **Not yet exploited:** newly published vulnerabilities at **Critical 9+** (last 14 days) or **High 7+** (last 7 days), as an early warning. Brand-new CVEs often only have the vendor's own score for the first days (marked *), so the newest 7 days are scanned in full rather than relying on NVD's severity filter. Each also shows CISA's early assessment of exploitation (none / proof-of-concept / exploited) and its EPSS score. Use **All / Exploited / Not yet** to choose what to show.
 - **Your vendors:** a filter based on the vendors in the Services tab. Change it with **⚙ Edit list**; the list is saved in your browser. **By vendor** in the side panel shows counts; click one to filter.
 
 Services cards show "⚠ N exploited vulnerabilities (30d)" for their vendor and link to this tab.
 
-The data refreshes every hour (`VULN_REFRESH_MINUTES`). `KEV_DAYS` (default 90, max 120) and `NVD_CRITICAL_DAYS` (default 14) control the look-back. NVD limits requests without an API key. A free key from nvd.nist.gov/developers set as `NVD_API_KEY` is optional; the site works without one.
+The data refreshes every hour (`VULN_REFRESH_MINUTES`). `KEV_DAYS` (default 90, max 120), `NVD_CRITICAL_DAYS` (default 14) and `NVD_FRESH_DAYS` (default 7) control the look-back. NVD limits requests without an API key. A free key from nvd.nist.gov/developers set as `NVD_API_KEY` is optional; the site works without one.
 
 ## Services tab
 

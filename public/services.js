@@ -35,6 +35,7 @@
     if (s.news.count24h) parts.push(`${s.news.count24h} news report${s.news.count24h > 1 ? 's' : ''} (24h)`);
     if (s.news.ddReports) parts.push(`<span class="dd">~${fmt(s.news.ddReports)} Downdetector reports</span>`);
     if (s.vulns?.count) parts.push(`<a class="vuln-link" href="#vulns?vendor=${encodeURIComponent(s.vulns.vendorKey)}" title="Open in the Vulnerabilities tab">⚠ ${s.vulns.count} exploited vulnerabilit${s.vulns.count > 1 ? 'ies' : 'y'} (30d)${s.vulns.ransomware ? ', ransomware-linked' : ''}</a>`);
+    if (s.vulns?.critical) parts.push(`<a class="crit-link" href="#vulns?vendor=${encodeURIComponent(s.vulns.vendorKey)}" title="Critical (CVSS 9+) vulnerabilities published in the last 14 days, not yet known to be exploited">🔴 ${s.vulns.critical} new critical vulnerabilit${s.vulns.critical > 1 ? 'ies' : 'y'}</a>`);
     if (s.health?.ransomware?.length) {
       const r = s.health.ransomware[0];
       parts.push(`<a class="vuln-link" href="#health" title="Open the Healthcare tab">🚨 Listed by ransomware gang ${escH(r.group)} (${new Date(r.discovered).toLocaleDateString([], { month: 'short', day: 'numeric' })})</a>`);

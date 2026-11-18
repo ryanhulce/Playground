@@ -8,6 +8,9 @@
   };
   let vd = null;
   let scope = localStorage.getItem('vulnScope') || 'mine';
+  let show = localStorage.getItem('vulnShow') || 'both';      // both | exploited | new
+  const sevSel = el('vuln-sev');
+  sevSel.value = localStorage.getItem('vulnSev') || '9';
   let vendorFilter = null; // from #vulns?vendor=key
   const open = new Set();
   const WL_KEY = 'vulnWatchlist';
@@ -26,7 +29,14 @@
   function cvssBadge(c) {
     if (!c) return '<span class="vb none" title="No CVSS score published yet">CVSS –</span>';
     const cls = c.score >= 9 ? 'crit' : c.score >= 7 ? 'high' : c.score >= 4 ? 'med' : 'low';
-    return `<span class="vb ${cls}" title="CVSS ${esc(c.version)} base score (${esc(c.severity || '')})">CVSS ${c.score.toFixed(1)}</span>`;
+    const who = c.source === 'vendor' ? ' (vendor score: NVD has not analysed it yet)' : '';
+    return `<span class="vb ${cls}" title="CVSS ${esc(c.version)} base score ${esc(c.severity || '')}${who}">CVSS ${c.score.toFixed(1)}${c.source === 'vendor' ? '*' : ''}</span>`;
+  }
+  function ssvcBadge(x) {
+    if (!x) return '';
+    const map = { active: ['crit', 'CISA: exploited'], poc: ['high', 'CISA: PoC'], none: ['low', 'CISA: none'] };
+    const [cls, txt] = map[x.exploitation] || ['low', `CISA: ${x.exploitation}`];
+    return `<span class="vb ${cls}" title="CISA's assessment: exploitation ${esc(x.exploitation)}${x.automatable ? `, automatable: ${esc(x.automatable)}` : ''}${x.impact ? `, technical impact: ${esc(x.impact)}` : ''}">${txt}</span>`;
   }
   function epssBadge(e) {
     if (!e) return '<span class="vb none" title="No EPSS score yet">EPSS –</span>';
@@ -43,8 +53,9 @@
     const keep = (v) => (vendorFilter ? v.vendorKey === vendorFilter : scope === 'all' || wl.has(v.vendorKey)) &&
       (!q || `${v.cve} ${v.vendor} ${v.product || ''} ${v.name || ''} ${v.description}`.toLowerCase().includes(q));
     const exploited = vd.exploited.filter((v) => keep(v) && daysAgo(v.dateAdded) < days && (!ui.ransom.checked || v.ransomware));
-    const critical = ui.ransom.checked ? [] : vd.newCritical.filter(keep);
-    return { exploited, critical };
+    const minSev = +sevSel.value;
+    const critical = ui.ransom.checked || show === 'exploited' ? [] : vd.newCritical.filter((v) => keep(v) && (v.cvss?.score || 0) >= minSev && daysAgo(v.published) < (minSev >= 9 ? vd.criticalDays : vd.freshDays || 7));
+    return { exploited: show === 'new' ? [] : exploited, critical };
   }
 
   function row(v, kind) {
@@ -61,7 +72,7 @@
           <div class="vrow-title"><span class="cve">${esc(v.cve)}</span>${isNew ? '<span class="vb new">NEW</span>' : ''} ${esc(title)}</div>
           <div class="vrow-meta">${meta}</div>
         </div>
-        <div class="vrow-badges">${v.ransomware ? '<span class="vb ransom" title="Known to be used in ransomware campaigns">Ransomware</span>' : ''}${cvssBadge(v.cvss)}${epssBadge(v.epss)}</div>
+        <div class="vrow-badges">${v.ransomware ? '<span class="vb ransom" title="Known to be used in ransomware campaigns">Ransomware</span>' : ''}${kind === 'crit' ? ssvcBadge(v.ssvc) : ''}${cvssBadge(v.cvss)}${epssBadge(v.epss)}</div>
       </div>
       ${isOpen ? `<div class="vrow-detail">
         <p>${esc(v.description)}</p>
@@ -89,17 +100,19 @@
       <span class="chip"><i class="dot hack"></i>${exploited.length} exploited</span>
       <span class="chip"><i class="dot outage"></i>${week} this week</span>
       <span class="chip"><i class="dot" style="background:#d2a8ff"></i>${ransom} ransomware</span>
-      <span class="chip"><i class="dot" style="background:var(--accent)"></i>${critical.length} new critical</span>
+      <span class="chip"><i class="dot" style="background:var(--accent)"></i>${critical.length} new ${+sevSel.value >= 9 ? 'critical' : 'high/critical'}</span>
       ${vendorFilter ? `<span class="chip vendor-chip">Vendor: ${esc(vendorName(vendorFilter))} <button id="vf-clear" title="Show all your vendors">×</button></span>` : ''}`;
 
     const scopeLabel = vendorFilter ? esc(vendorName(vendorFilter)) : scope === 'all' ? 'all vendors' : 'your vendors';
+    const sevLabel = +sevSel.value >= 9 ? 'Critical' : 'High & critical';
+    const newDays = +sevSel.value >= 9 ? vd.criticalDays : vd.freshDays || 7;
     ui.main.innerHTML = `
-      <h3 class="cat-title">Confirmed exploited · CISA KEV · ${scopeLabel}</h3>
-      ${exploited.length ? exploited.map((v) => row(v, 'kev')).join('') : `<p class="muted pad">No exploited vulnerabilities from ${scopeLabel} were added in the last ${days} days.</p>`}
-      ${ui.ransom.checked ? '' : `
-      <h3 class="cat-title">New critical, not yet known to be exploited · NVD · last ${vd.criticalDays} days</h3>
-      <p class="muted small">CVSS 9.0+ vulnerabilities published recently. Watch the EPSS score: a high value means exploitation is likely soon.</p>
-      ${critical.length ? critical.map((v) => row(v, 'crit')).join('') : `<p class="muted pad">No new critical vulnerabilities from ${scopeLabel}.</p>`}`}
+      ${show === 'new' ? '' : `<h3 class="cat-title">Confirmed exploited · CISA KEV · ${scopeLabel}</h3>
+      ${exploited.length ? exploited.map((v) => row(v, 'kev')).join('') : `<p class="muted pad">No exploited vulnerabilities from ${scopeLabel} were added in the last ${days} days.</p>`}`}
+      ${ui.ransom.checked || show === 'exploited' ? '' : `
+      <h3 class="cat-title">${sevLabel}, not yet known to be exploited · last ${newDays} days · ${scopeLabel}</h3>
+      <p class="muted small">Newly published vulnerabilities, including ones NVD hasn't analysed yet (score marked *, from the vendor). Watch EPSS and CISA's assessment: "PoC" or a rising EPSS means exploitation may be close.</p>
+      ${critical.length ? critical.map((v) => row(v, 'crit')).join('') : `<p class="muted pad">No new ${sevLabel.toLowerCase()} vulnerabilities from ${scopeLabel}.</p>`}`}
       <p class="muted small pad">CISA catalog version ${esc(vd.kevCatalogVersion || '')} · checked ${ago(vd.updatedAt)}</p>`;
 
     // By-vendor counts (exploited, same period & ransomware filter, ignoring scope)
@@ -162,6 +175,16 @@
   });
   document.querySelectorAll('#vuln-scope button').forEach((x) => x.classList.toggle('on', x.dataset.scope === scope));
   ui.range.addEventListener('change', render);
+  el('vuln-show').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    show = b.dataset.show;
+    localStorage.setItem('vulnShow', show);
+    document.querySelectorAll('#vuln-show button').forEach((x) => x.classList.toggle('on', x === b));
+    render();
+  });
+  document.querySelectorAll('#vuln-show button').forEach((x) => x.classList.toggle('on', x.dataset.show === show));
+  sevSel.addEventListener('change', () => { localStorage.setItem('vulnSev', sevSel.value); render(); });
   ui.ransom.addEventListener('change', render);
   ui.search.addEventListener('input', render);
   el('vuln-edit').addEventListener('click', (e) => { e.stopPropagation(); if (!vd?.vendors?.length) return; renderVendorPanel(); ui.panel.hidden = !ui.panel.hidden; });
