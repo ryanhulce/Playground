@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Outage &amp; Hack Map</title>
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="pulse"></span>
+      <h1>Outage &amp; Hack Map</h1>
+    </div>
+    <nav class="tabs">
+      <a href="#map" data-tab="map" class="on">🗺 Map</a>
+      <a href="#services" data-tab="services">📊 Services</a>
+      <a href="#vulns" data-tab="vulns">🛡 Vulnerabilities</a>
+      <a href="#health" data-tab="health">🏥 Healthcare</a>
+    </nav>
+    <div class="stats map-only">
+      <div class="stat"><b id="stat-hack">–</b><span>hacks &amp; attacks</span></div>
+      <div class="stat"><b id="stat-outage">–</b><span>outages</span></div>
+      <div class="stat"><b id="stat-internet">–</b><span>internet outages</span></div>
+      <div class="stat"><b id="stat-places">–</b><span>places affected</span></div>
+    </div>
+    <div class="controls map-only">
+      <div class="seg" id="type-filter">
+        <button data-type="all" class="on">All</button>
+        <button data-type="hack">Hacks</button>
+        <button data-type="outage">Outages</button>
+        <button data-type="internet" title="Measured internet outages (IODA, Cloudflare Radar)">Internet</button>
+      </div>
+      <select id="range">
+        <option value="24">Last 24 h</option>
+        <option value="72" selected>Last 3 days</option>
+        <option value="168">Last 7 days</option>
+      </select>
+      <input id="search" type="search" placeholder="Filter headlines…" />
+      <button id="refresh" title="Fetch fresh data now">↻</button>
+    </div>
+  </header>
+
+  <main id="view-map">
+    <aside>
+      <div class="list-head">
+        <span id="list-count">Loading…</span>
+        <span id="updated" class="muted"></span>
+      </div>
+      <ul id="list"></ul>
+      <details id="sources-box">
+        <summary>Sources</summary>
+        <ul id="sources"></ul>
+      </details>
+    </aside>
+    <div id="map"></div>
+  </main>
+
+  <section id="view-services" hidden>
+    <div class="svc-toolbar">
+      <div class="svc-summary" id="svc-summary"></div>
+      <div class="seg" id="svc-filter">
+        <button data-f="all" class="on">All</button>
+        <button data-f="issues">Issues only</button>
+      </div>
+      <select id="svc-cat" title="Show one category">
+        <option value="">All categories</option>
+        <option value="Healthcare:">Healthcare (all)</option>
+      </select>
+      <input id="svc-search" type="search" placeholder="Find a service…" />
+      <button id="svc-refresh" title="Fetch fresh data now">↻</button>
+    </div>
+    <div class="svc-body">
+      <div class="svc-main" id="svc-main"><p class="muted pad">Loading service status…</p></div>
+      <aside class="svc-side">
+        <h2>Hospitals &amp; health systems</h2>
+        <p class="muted small">Recent cyberattacks, EHR/IT outages and diversions reported in the news.</p>
+        <ul class="feed" id="feed-hospitals"></ul>
+        <h2>Downdetector in the news</h2>
+        <p class="muted small">Recent stories citing Downdetector user reports. <a href="https://downdetector.com/" target="_blank" rel="noopener">Open Downdetector ↗</a></p>
+        <ul class="feed" id="feed-downdetector"></ul>
+        <h2>ThousandEyes in the news</h2>
+        <p class="muted small">Network-level outage analysis. <a href="https://www.thousandeyes.com/outages/" target="_blank" rel="noopener">Open ThousandEyes outage map ↗</a></p>
+        <ul class="feed" id="feed-thousandeyes"></ul>
+        <details>
+          <summary>Sources</summary>
+          <ul id="svc-sources" class="src-list"></ul>
+        </details>
+      </aside>
+    </div>
+  </section>
+
+  <section id="view-vulns" hidden>
+    <div class="svc-toolbar">
+      <div class="svc-summary" id="vuln-summary"></div>
+      <div class="seg" id="vuln-scope">
+        <button data-scope="mine" class="on" title="Only vendors on your list">Your vendors</button>
+        <button data-scope="all">All vendors</button>
+      </div>
+      <select id="vuln-range" title="Added to CISA's list within">
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+      <label class="check" title="Only vulnerabilities known to be used in ransomware attacks"><input type="checkbox" id="vuln-ransom" /> Ransomware</label>
+      <input id="vuln-search" type="search" placeholder="Search CVE, product…" style="width:160px" />
+      <button id="vuln-edit" title="Choose which vendors count as yours">⚙ Edit list</button>
+    </div>
+    <div class="svc-body">
+      <div class="svc-main" id="vuln-main"><p class="muted pad">Loading vulnerability data… the first load can take about 15 seconds.</p></div>
+      <aside class="svc-side">
+        <h2>By vendor</h2>
+        <p class="muted small">Confirmed-exploited vulnerabilities in the selected period. Click to filter.</p>
+        <ul class="src-list" id="vuln-byvendor"></ul>
+        <h2>How to read this</h2>
+        <ul class="legend-list small">
+          <li><b>Exploited</b>: on CISA's Known Exploited Vulnerabilities list, so attackers are using it. Patch these first.</li>
+          <li><b>CVSS</b>: how severe it is, 0–10 (9+ critical, 7+ high).</li>
+          <li><b>EPSS</b>: estimated chance it will be exploited in the next 30 days.</li>
+          <li><b>CISA deadline</b>: the patch deadline for U.S. federal agencies, a useful benchmark.</li>
+          <li><b>Ransomware</b>: known to be used in ransomware attacks.</li>
+        </ul>
+        <details>
+          <summary>Sources</summary>
+          <ul id="vuln-sources" class="src-list"></ul>
+        </details>
+      </aside>
+    </div>
+    <div id="vuln-vendors" class="vendor-panel" role="dialog" aria-label="Your vendors" hidden>
+      <div class="wn-head"><b>Your vendors</b><button id="vv-close" type="button" aria-label="Close">×</button></div>
+      <p class="muted small pad-x">Vulnerabilities from these vendors appear under "Your vendors". Saved in this browser.</p>
+      <div id="vv-list" class="vv-list"></div>
+      <div class="vv-actions"><button id="vv-all" type="button">Select all</button><button id="vv-reset" type="button">Reset to defaults</button></div>
+    </div>
+  </section>
+
+  <section id="view-health" hidden>
+    <div class="svc-toolbar">
+      <div class="svc-summary" id="hc-summary"></div>
+      <select id="hc-state" title="Filter HHS breach reports by state"><option value="">All states</option></select>
+      <label class="check" title="Only ransomware victims in the United States"><input type="checkbox" id="hc-us" /> US only</label>
+      <label class="check" title="Only items that match your vendors"><input type="checkbox" id="hc-mine" /> Your vendors only</label>
+      <input id="hc-search" type="search" placeholder="Search organisation…" style="width:170px" />
+    </div>
+    <div class="svc-body">
+      <div class="svc-main" id="hc-main"><p class="muted pad">Loading healthcare data…</p></div>
+      <aside class="svc-side">
+        <h2>⚠ Your vendors</h2>
+        <p class="muted small">Your Services vendors that appear in any of these sources.</p>
+        <ul class="feed" id="hc-vendors"></ul>
+        <h2>Most active ransomware groups</h2>
+        <p class="muted small">Healthcare victims posted, last 30 days.</p>
+        <ul class="src-list" id="hc-groups"></ul>
+        <h2>About these sources</h2>
+        <ul class="legend-list small">
+          <li><b>Ransomware leak sites</b> (ransomware.live): organisations a gang claims to have attacked. Usually days before the news; occasionally a false claim.</li>
+          <li><b>HHS breach reports</b>: breaches of health information affecting 500+ people. HHS publishes them about 4–6 weeks after they're reported.</li>
+          <li><b>CISA device advisories</b>: security flaws in medical devices and clinical software.</li>
+          <li><b>FDA</b>: Class I recalls (most serious) and MedWatch safety alerts.</li>
+        </ul>
+        <details>
+          <summary>Sources</summary>
+          <ul id="hc-sources" class="src-list"></ul>
+        </details>
+      </aside>
+    </div>
+  </section>
+
+  <div class="legend map-only">
+    <span><i class="dot hack"></i>Hack / cyberattack</span>
+    <span><i class="dot outage"></i>Outage / site down</span>
+    <span><i class="dot internet"></i>Internet outage (measured)</span>
+    <span class="muted">Thick ring = ongoing</span>
+    <span class="muted">Circle size = number of incidents</span>
+  </div>
+
+  <footer id="site-footer">
+    <span>Outage &amp; Hack Map <button id="ver" type="button" title="What's new" aria-haspopup="dialog" aria-expanded="false">v…</button></span>
+    <span id="ver-detail" class="muted"></span>
+  </footer>
+  <div id="whats-new" role="dialog" aria-label="What's new" hidden>
+    <div class="wn-head"><b>What's new</b><button id="wn-close" type="button" aria-label="Close">×</button></div>
+    <div id="wn-body"></div>
+  </div>
+
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script src="/app.js"></script>
+  <script src="/services.js"></script>
+  <script src="/vulns.js"></script>
+  <script src="/health.js"></script>
+  <script>
+    fetch('/api/version').then((r) => r.json()).then((v) => {
+      const fmt = (d) => new Date(d).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+      document.getElementById('ver').textContent = `v${v.version}`;
+      document.getElementById('ver-detail').textContent =
+        `Released ${new Date(v.releaseDate + 'T12:00:00').toLocaleDateString([], { dateStyle: 'medium' })} · Server started ${fmt(v.startedAt)} · Data refreshes every ${v.refreshMinutes} min`;
+      document.getElementById('ver-detail').title = `Node ${v.node}`;
+      const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      document.getElementById('wn-body').innerHTML = (v.changelog || []).map((r) => `
+        <section class="${r.version === v.version ? 'current' : ''}">
+          <h4>v${esc(r.version)} <span class="muted">${new Date(r.date + 'T12:00:00').toLocaleDateString([], { dateStyle: 'medium' })}</span>
+            ${r.version === v.version ? '<span class="badge ok">running now</span>' : ''}</h4>
+          <ul>${r.changes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>
+        </section>`).join('');
+    }).catch(() => {});
+
+    // "What's new" panel: toggled from the version button, closed by ×, Esc or clicking elsewhere.
+    const wn = document.getElementById('whats-new');
+    const verBtn = document.getElementById('ver');
+    const setWn = (open) => { wn.hidden = !open; verBtn.setAttribute('aria-expanded', String(open)); };
+    verBtn.addEventListener('click', (e) => { e.stopPropagation(); setWn(wn.hidden); });
+    document.getElementById('wn-close').addEventListener('click', () => setWn(false));
+    document.addEventListener('click', (e) => { if (!wn.hidden && !wn.contains(e.target)) setWn(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setWn(false); });
+  </script>
+</body>
+</html>
