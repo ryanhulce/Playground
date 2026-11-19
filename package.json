@@ -1,6 +1,6 @@
 {
   "name": "outage-hack-map",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "releaseDate": "2026-11-19",
   "description": "Scours news feeds and status pages for hacks and website outages, and plots them on a world map.",
   "main": "server.js",

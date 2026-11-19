@@ -61,7 +61,7 @@
         <span class="muted"> · ${escH(a.source)} · ${agoS(a.published)}</span></li>`).join('')}</ul>` : ''}
       <div class="links">
         ${s.official?.page ? `<a href="${escH(s.official.page)}" target="_blank" rel="noopener">Official status page ↗</a>` : ''}
-        <a href="${escH(s.links.downdetector)}" target="_blank" rel="noopener">Downdetector ↗</a>
+        ${s.links.downdetector ? `<a href="${escH(s.links.downdetector)}" target="_blank" rel="noopener" title="Find this service on Downdetector (opens a Google search limited to downdetector.com)">Downdetector ↗</a>` : ''}
         <a href="${escH(s.links.thousandeyes)}" target="_blank" rel="noopener">ThousandEyes ↗</a>
       </div>
     </div>`;
