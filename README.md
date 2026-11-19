@@ -32,6 +32,10 @@ Then open http://localhost:3000. The first crawl takes about 10–20 seconds.
 
 Reports with no recognisable place are listed under "Global / location unknown" in the sidebar.
 
+## Map view filtering
+
+When you zoom in or pan, the sidebar list and the counts at the top only include stories whose pins are in view. Stories without a location are hidden while zoomed in, with a note saying how many. **🌍 Reset** returns to the world view.
+
 ## Grouped news
 
 Headlines about the same event are grouped into one incident on the Map, so one big outage doesn't fill the list 40 times. The incident shows a **📰 N headlines · N outlets** tag; click it to see every outlet's story. It also shows when the event was first and most recently reported.

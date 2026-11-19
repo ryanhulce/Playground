@@ -49,6 +49,15 @@ function filtered() {
     (!q || `${it.title} ${it.summary} ${it.source} ${it.locations.map((l) => l.name).join(' ')} ${(it.sources || []).map((s) => `${s.title} ${s.source}`).join(' ')}`.toLowerCase().includes(q)));
 }
 
+// ---- map view filter: when zoomed in, the list and counts only include what's in view ----
+function viewState() {
+  const b = map.getBounds();
+  const active = b.getEast() - b.getWest() < 340; // the whole world isn't visible
+  // Pins can sit on a wrapped copy of the world, so also test longitude ±360.
+  const inView = (l) => [0, 360, -360].some((k) => b.contains([l.lat, l.lon + k]));
+  return { active, inView };
+}
+
 function render() {
   const items = filtered();
 
@@ -80,16 +89,29 @@ function render() {
     markersByPlace.set(g.loc.name, marker);
   }
 
-  // ---- stats ----
-  document.getElementById('stat-hack').textContent = items.filter((i) => i.type === 'hack').length;
-  document.getElementById('stat-outage').textContent = items.filter((i) => i.type === 'outage').length;
-  document.getElementById('stat-internet').textContent = items.filter((i) => i.type === 'internet').length;
-  document.getElementById('stat-places').textContent = groups.size;
+  renderList(items);
+}
+
+// Sidebar list + header counts. Called on every map move, so it doesn't touch the pins.
+function renderList(items = filtered()) {
+  const view = viewState();
+  const inView = (it) => it.locations.some(view.inView);
+  const visible = view.active ? items.filter(inView) : items;
+  const hiddenGlobal = view.active ? items.filter((i) => !i.locations.length).length : 0;
+
+  // ---- stats (for the current view) ----
+  const places = new Set(visible.flatMap((i) => i.locations.filter((l) => !view.active || view.inView(l)).map((l) => l.name)));
+  document.getElementById('stat-hack').textContent = visible.filter((i) => i.type === 'hack').length;
+  document.getElementById('stat-outage').textContent = visible.filter((i) => i.type === 'outage').length;
+  document.getElementById('stat-internet').textContent = visible.filter((i) => i.type === 'internet').length;
+  document.getElementById('stat-places').textContent = places.size;
 
   // ---- list ----
-  const located = items.filter((i) => i.locations.length);
-  const unlocated = items.filter((i) => !i.locations.length);
-  ui.listCount.textContent = `${items.length} reports · ${located.length} mapped`;
+  const located = visible.filter((i) => i.locations.length);
+  const unlocated = visible.filter((i) => !i.locations.length);
+  ui.listCount.innerHTML = view.active
+    ? `Showing ${visible.length} in map view <button id="reset-view" class="reset-view" title="Zoom out to the whole world">🌍 Reset</button>`
+    : `${items.length} reports · ${located.length} mapped`;
   const row = (it) => `<li class="${it.type}" data-id="${it.id}">
       <div class="item-title">${esc(it.title)}</div>
       <div class="item-meta">
@@ -103,10 +125,13 @@ function render() {
       </div>
       ${it.sources && expanded.has(it.id) ? `<ul class="src-headlines">${it.sources.map((s) => `<li><a href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.title)}</a> <span class="muted">· ${esc(s.source)} · ${ago(s.published)}</span></li>`).join('')}</ul>` : ''}
     </li>`;
+  const scroll = ui.list.scrollTop;
   ui.list.innerHTML =
-    (located.length ? `<li class="section">On the map</li>${located.map(row).join('')}` : '') +
+    ((located.length ? `<li class="section">${view.active ? 'In this area' : 'On the map'}</li>${located.map(row).join('')}` : '') +
     (unlocated.length ? `<li class="section">Global / location unknown</li>${unlocated.map(row).join('')}` : '') ||
-    `<li class="section">${data.updatedAt ? 'Nothing matches these filters' : 'Fetching sources… first load can take ~15s'}</li>`;
+    `<li class="section">${!data.updatedAt ? 'Fetching sources… first load can take ~15s' : view.active ? 'Nothing reported in this area. Zoom out or pan to see more.' : 'Nothing matches these filters'}</li>`) +
+    (hiddenGlobal ? `<li class="section note">${hiddenGlobal} stor${hiddenGlobal === 1 ? 'y' : 'ies'} without a location hidden while zoomed in</li>` : '');
+  ui.list.scrollTop = scroll;
 
   ui.sources.innerHTML = data.sources
     .slice().sort((a, b) => a.ok - b.ok || a.name.localeCompare(b.name))
@@ -117,7 +142,7 @@ function render() {
 
 ui.list.addEventListener('click', (e) => {
   const tog = e.target.closest('[data-toggle]');
-  if (tog) { expanded.has(tog.dataset.toggle) ? expanded.delete(tog.dataset.toggle) : expanded.add(tog.dataset.toggle); render(); return; }
+  if (tog) { expanded.has(tog.dataset.toggle) ? expanded.delete(tog.dataset.toggle) : expanded.add(tog.dataset.toggle); renderList(); return; }
   if (e.target.closest('.src-headlines a')) return; // let headline links open normally
   const li = e.target.closest('li[data-id]');
   if (!li) return;
@@ -137,6 +162,11 @@ document.getElementById('type-filter').addEventListener('click', (e) => {
   render();
 });
 ui.range.addEventListener('change', render);
+map.on('moveend', () => renderList());
+const WORLD_VIEW = { center: [25, 10], zoom: 2 };
+document.querySelector('.list-head').addEventListener('click', (e) => {
+  if (e.target.closest('#reset-view')) map.flyTo(WORLD_VIEW.center, WORLD_VIEW.zoom, { duration: 0.6 });
+});
 ui.search.addEventListener('input', render);
 
 async function load() {

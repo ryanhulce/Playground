@@ -254,3 +254,7 @@ button.more { margin: 2px 0 10px; font-size: 12px; padding: 4px 10px; }
 /* Vulnerabilities toolbar: summary counts on the first row, all filters on the second. */
 #view-vulns .svc-toolbar #vuln-summary { flex-basis: 100%; margin-right: 0; }
 #view-vulns .svc-toolbar { row-gap: 8px; }
+
+/* ---------- list follows the map ---------- */
+.reset-view { font-size: 11px; padding: 1px 8px; margin-left: 6px; border-radius: 999px; }
+#list li.section.note { text-transform: none; letter-spacing: 0; font-style: italic; }
