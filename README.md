@@ -53,6 +53,7 @@ How it works (`lib/cluster.js`):
 Purple pins on the map are internet outages **measured** by network monitoring, not taken from headlines:
 
 - **IODA** (Georgia Tech) detects country-level disruptions from internet routing (BGP), active probing and background "darknet" traffic. It needs no setup.
+  Only **significant** IODA outages are shown: two or more independent measurements agree (e.g. routing *and* traffic) with a score of 3,000+, a single measurement scoring 20,000+ that lasts under 3 days, or any score of 50,000+. This hides the many brief, low-level blips IODA flags, which typically cuts ~100 countries to ~10. Set `IODA_SHOW_ALL=1` to show everything.
 - **Cloudflare Radar** lists confirmed outages with a cause (power outage, cable cut, government shutdown, …) and the networks affected. It needs a free API token:
   1. Sign in at dash.cloudflare.com (a free account is fine) and go to **My Profile → API Tokens → Create Token → Create Custom Token**.
   2. Add the permission **Account → Radar → Read**, then create the token and copy it.
